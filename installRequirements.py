@@ -17,8 +17,8 @@ except: pass
 try: os.system("python3 -m pip install pygame colorama tk-tools")
 except: pass
 try:
-    import tkinter.messagebox
-    import tkinter.simpledialog
+    import tkinter.messagebox as messagebox
+    import tkinter.simpledialog as simpledialog
     import pygame
     import colorama
 except:

@@ -173,7 +173,6 @@ def save():
     json.dump({
         "vertices": vertices, "edges": edges, "isWeighted": isWeighted
     }, open(location, "w"))
-buttons.append(Button(10, 10, 100, 40, "Save", font.medium, save))
 
 def load():
     global vertices, edges, isWeighted, location
@@ -188,10 +187,8 @@ def load():
     vertices = data["vertices"]
     edges = data["edges"]
     isWeighted = data["isWeighted"]
-buttons.append(Button(10, 60, 100, 40, "Load", font.medium, load))
 
 controlsInfo = general["controlsInfo"]
-buttons.append(Button(10, 110, 140, 40, "Controls", font.medium, lambda: messagebox.showinfo("Controls", "\n".join(controlsInfo))))
 
 def properExit():
     if vertices == [] and edges == []: pygame.quit(); sys.exit()
@@ -202,8 +199,6 @@ def properExit():
             if json.load(open(location, "r")) != {"vertices": vertices, "edges": edges, "isWeighted": isWeighted}: save()
     pygame.quit()
     sys.exit(0)
-
-buttons.append(Button(10, 160, 100, 40, "Quit", font.medium, properExit))
 
 def dijkstra(vertices, edges, start, end):
     start = tuple(start)
@@ -218,8 +213,10 @@ def dijkstra(vertices, edges, start, end):
     while unvisited:
         current = min(unvisited, key = lambda vertex: distances[vertex])
         unvisited.remove(current)
+        
         if current == end:
             break
+
         for neighbor in vertices:
             if neighbor in unvisited:
                 for edge in edges:
@@ -229,6 +226,7 @@ def dijkstra(vertices, edges, start, end):
                             if alt < distances[neighbor]:
                                 distances[neighbor] = alt
                                 previous[neighbor] = current
+
                     elif edge[3] == "db":
                         if (edge[0] == current and edge[1] == neighbor) or (edge[1] == current and edge[0] == neighbor):
                             alt = distances[current] + edge[2]
@@ -256,13 +254,10 @@ def leastExpensivePath():
     path = dijkstra(vertices, edges, start, end)
     messagebox.showinfo("Least expensive path", f"Path: {', '.join(vertex[2] for vertex in path)}")
 
-buttons.append(Button(10, 210, 120, 40, "Dijkstra", font.medium, leastExpensivePath))
-
 def clear():
     global vertices, edges
     vertices.clear()
     edges.clear()
-buttons.append(Button(10, 260, 100, 40, "Clear", font.medium, clear))
 
 def settings():
     settings_ = general
@@ -342,9 +337,16 @@ def settings():
     applyButton.grid(row = 7, column = 0)
 
     root.mainloop()
-buttons.append(Button(10, 310, 110, 40, "Settings", font.medium, settings))
 
-buttonPanelRect = pygame.Rect(0, 0, 150, height)
+buttons.append(Button(10, 10, 100, 40, "Save", font.medium, save))
+buttons.append(Button(10, 60, 100, 40, "Load", font.medium, load))
+buttons.append(Button(10, 110, 140, 40, "Controls", font.medium, lambda: messagebox.showinfo("Controls", "\n".join(controlsInfo))))
+buttons.append(Button(10, 160, 110, 40, "Settings", font.medium, settings))
+buttons.append(Button(10, 210, 100, 40, "Quit", font.medium, properExit))
+buttons.append(Button(10, 310, 100, 40, "Clear", font.medium, clear))
+buttons.append(Button(10, 360, 110, 40, "Dijkstra", font.medium, leastExpensivePath))
+
+buttonPanelRect = pygame.Rect(0, 0, 160, height)
 buttonPanelBG = pygame.Surface((buttonPanelRect.width, buttonPanelRect.height))
 s = pygame.Surface((2, 5))
 pygame.draw.line(s, (50, 50, 50), (0, 0), (0, 2))
@@ -429,7 +431,8 @@ while True:
                     if selectedEdge != None:
                         def clearPopUpButtons(): PopUpButtons.clear()
                         def remove():
-                            edges.remove(edges[edges.index(edge)])
+                            if selectedEdge in edges:
+                                edges.remove(selectedEdge)
                             clearPopUpButtons()
                         def changeWeight():
                             global isWeighted
@@ -450,15 +453,8 @@ while True:
 
                     elif selectedVertex != None:
                         def clearPopUpButtons(): PopUpButtons.clear()
-                        def remove(): 
-                            index = vertices.index(selectedVertex)
-                            for edge in edges:
-                                for i in edge[:1]:
-                                    if i == index:
-                                        edges.remove(edge)
-                                        break
-                                    elif i > index:
-                                        edge[edge.index(i)] -= 1
+                        def remove():
+                            edges[:] = [edge for edge in edges if edge[0] != selectedVertex and edge[1] != selectedVertex]
                             vertices.remove(selectedVertex)
                             clearPopUpButtons()
                         def rename():
