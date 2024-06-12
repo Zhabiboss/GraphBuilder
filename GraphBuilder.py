@@ -147,6 +147,8 @@ PopUpButtons: list[PopUpButton] = []
 selected = None
 buttons: list[Button] = []
 
+location = None
+
 content = ""
 with open("Storage/latestRestart.json", "r") as latest:
     content = latest.read()
@@ -155,6 +157,9 @@ with open("Storage/latestRestart.json", "r") as latest:
         vertices = data["vertices"]
         edges = data["edges"]
         isWeighted = data["isWeighted"]
+        location = data["location"]
+        pygame.display.set_caption(f"Graph Builder {version}  |  {os.path.basename(location)[:-5]}" if location != None \
+                                   else f"Graph Builder {version}  |  unnamed graph")
     latest.close()
 
 if content != "":
@@ -162,7 +167,23 @@ if content != "":
         latest.write("")
         latest.close()
 
-location = None
+contentF11 = ""
+with open("Storage/latestRestartF11.json", "r") as latestF11:
+    contentF11 = latestF11.read()
+    if contentF11 != "":
+        data = json.loads(contentF11)
+        vertices = data["vertices"]
+        edges = data["edges"]
+        isWeighted = data["isWeighted"]
+        location = data["location"]
+        pygame.display.set_caption(f"Graph Builder {version}  |  {os.path.basename(location)[:-5]}" if location != None \
+                                   else f"Graph Builder {version}  |  unnamed graph")
+    latestF11.close()
+
+if contentF11 != "":
+    with open("Storage/latestRestartF11.json", "w") as latestF11:
+        latestF11.write("")
+        latestF11.close()
 
 def save():
     global location
@@ -213,7 +234,7 @@ def dijkstra(vertices, edges, start, end):
     while unvisited:
         current = min(unvisited, key = lambda vertex: distances[vertex])
         unvisited.remove(current)
-        
+
         if current == end:
             break
 
@@ -327,7 +348,7 @@ def settings():
         json.dump(settings_, open("Resources/general.json", "w"), indent = 4)
 
         json.dump({
-            "vertices": vertices, "edges": edges, "isWeighted": isWeighted
+            "vertices": vertices, "edges": edges, "isWeighted": isWeighted, "location": location
         }, open("Storage/latestRestart.json", "w"))
 
         python = sys.executable
@@ -362,16 +383,15 @@ while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT: properExit()
 
-        """if event.type == pygame.KEYDOWN:
+        if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_F11:
-                fullscreen = not fullscreen
-                if fullscreen: res = width, height = pygame.display.Info().current_w, pygame.display.Info().current_h
-                else: res = width, height = general["resolution"]["width"], general["resolution"]["height"]
-                screen = pygame.display.set_mode(res, pygame.FULLSCREEN if fullscreen else 0)
-                class font:
-                    small = pygame.font.Font(f"Resources/{fontFamily}", 14)
-                    medium = pygame.font.Font(f"Resources/{fontFamily}", 24)
-                    large = pygame.font.Font(f"Resources/{fontFamily}", 36)"""
+                general["fullscreen"] = not general["fullscreen"]
+                json.dump(general, open("Resources/general.json", "w"), indent = 4)
+                json.dump({
+                    "vertices": vertices, "edges": edges, "isWeighted": isWeighted, "location": location
+                }, open("Storage/latestRestartF11.json", "w"))
+                python = sys.executable
+                os.execl(python, python, * sys.argv)
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             wasPopUpButtonPressed = False
