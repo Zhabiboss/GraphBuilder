@@ -1,0 +1,18 @@
+{
+    "resolution": {
+        "width": 1080,
+        "height": 720
+    },
+    "fullscreen": false,
+    "fps": 144,
+    "version": "BETA",
+    "font": "Consolas.ttf",
+    "vertexSelectionRange": 30,
+    "drawBackgroundGrid": true,
+    "backgroundGridColor": "#101010",
+    "backgroundGridSize": 30,
+    "controlsInfo": [
+        "Left click: vertex/edge",
+        "Right click: rename/remove"
+    ]
+}
