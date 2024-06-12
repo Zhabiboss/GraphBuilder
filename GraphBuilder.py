@@ -203,6 +203,7 @@ controlsInfo = general["controlsInfo"]
 buttons.append(Button(10, 110, 140, 40, "Controls", font.medium, lambda: tkinter.messagebox.showinfo("Controls", "\n".join(controlsInfo))))
 
 def properExit():
+    if vertices == [] and edges == []: pygame.quit(); sys.exit()
     if not location: save()
     else:
         if not os.path.isfile(location): save()
