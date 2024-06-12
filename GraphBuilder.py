@@ -1,41 +1,17 @@
+# Author: Zhabiboss
+
 import os
 import math
 import json
 import sys
 try:
-    import tkinter.messagebox
-    import tkinter.simpledialog
+    import tkinter.messagebox as messagebox
+    import tkinter.simpledialog as simpledialog
     import tkinter
     import pygame
     import colorama
 except:
-    import os
-    import turtle
-
-    turtle.setup(500, 200)
-    turtle.hideturtle()
-    turtle.bgcolor("black")
-    turtle.pencolor("green")
-    turtle.write("Installing requirements...", align = "center", font = ("Arial", 20, "normal"))
-    
-    try: os.system("pip install pygame colorama tk-tools")
-    except: pass
-    try: os.system("pip3 install pygame colorama tk-tools")
-    except: pass
-    try: os.system("python -m pip install pygame colorama tk-tools")
-    except: pass
-    try: os.system("python3 -m pip install pygame colorama tk-tools")
-    except: pass
-    try:
-        import tkinter.messagebox
-        import tkinter.simpledialog
-        import pygame
-        import colorama
-    except:
-        print("Error: missing modules. Unable to use pip.")
-        sys.exit(1)
-
-    turtle.bye()
+    import installRequirements
 
 colorama.init()
 
@@ -63,7 +39,7 @@ fps = general["fps"]
 
 fontFamily = general["font"]
 if not os.path.isfile(f"Resources/{fontFamily}"):
-    tkinter.messagebox.showerror("Error", f"Font file not found: {fontFamily}")
+    messagebox.showerror("Error", f"Font file not found: {fontFamily}")
     print(f"{fg.RED} Error: font file not found in /Resources/: {fontFamily} {fg.RESET}")
     sys.exit(1)
 
@@ -171,11 +147,26 @@ PopUpButtons: list[PopUpButton] = []
 selected = None
 buttons: list[Button] = []
 
+content = ""
+with open("Storage/latestRestart.json", "r") as latest:
+    content = latest.read()
+    if content != "":
+        data = json.loads(content)
+        vertices = data["vertices"]
+        edges = data["edges"]
+        isWeighted = data["isWeighted"]
+    latest.close()
+
+if content != "":
+    with open("Storage/latestRestart.json", "w") as latest:
+        latest.write("")
+        latest.close()
+
 location = None
 
 def save():
     global location
-    location = tkinter.simpledialog.askstring('Save graph', 'Graph name: ', initialvalue = 'Graph')
+    location = simpledialog.askstring('Save graph', 'Graph name: ', initialvalue = 'Graph')
     if location == None: return
     pygame.display.set_caption(f"Graph Builder {version}  |  {location}")
     location += ".json"
@@ -186,10 +177,10 @@ buttons.append(Button(10, 10, 100, 40, "Save", font.medium, save))
 
 def load():
     global vertices, edges, isWeighted, location
-    location = tkinter.simpledialog.askstring('Load graph', 'Path to graph json: ', initialvalue = 'Graph.json')
+    location = simpledialog.askstring('Load graph', 'Path to graph json: ', initialvalue = 'Graph.json')
     if location == None: return
     elif not os.path.isfile(location):
-        tkinter.messagebox.showerror("Error", f"File not found: {location}")
+        messagebox.showerror("Error", f"File not found: {location}")
         print(f"{fg.RED} Error: file not found: {location} {fg.RESET}")
         return
     pygame.display.set_caption(f"Graph Builder {version}  |  {os.path.basename(location)[:-5]}")
@@ -200,7 +191,7 @@ def load():
 buttons.append(Button(10, 60, 100, 40, "Load", font.medium, load))
 
 controlsInfo = general["controlsInfo"]
-buttons.append(Button(10, 110, 140, 40, "Controls", font.medium, lambda: tkinter.messagebox.showinfo("Controls", "\n".join(controlsInfo))))
+buttons.append(Button(10, 110, 140, 40, "Controls", font.medium, lambda: messagebox.showinfo("Controls", "\n".join(controlsInfo))))
 
 def properExit():
     if vertices == [] and edges == []: pygame.quit(); sys.exit()
@@ -254,16 +245,16 @@ def dijkstra(vertices, edges, start, end):
     return path
 
 def leastExpensivePath():
-    start = tkinter.simpledialog.askstring("Least expensive path", "Start vertex: ")
+    start = simpledialog.askstring("Least expensive path", "Start vertex: ")
     if not start: return
-    end = tkinter.simpledialog.askstring("Least expensive path", "End vertex: ")
+    end = simpledialog.askstring("Least expensive path", "End vertex: ")
     if not end: return
     for vertex in vertices:
         if start == vertex[2]: start = vertex; break
     for vertex in vertices:
         if end == vertex[2]: end = vertex; break
     path = dijkstra(vertices, edges, start, end)
-    tkinter.messagebox.showinfo("Least expensive path", f"Path: {', '.join(vertex[2] for vertex in path)}")
+    messagebox.showinfo("Least expensive path", f"Path: {', '.join(vertex[2] for vertex in path)}")
 
 buttons.append(Button(10, 210, 120, 40, "Dijkstra", font.medium, leastExpensivePath))
 
@@ -279,16 +270,17 @@ def settings():
     root = tkinter.Tk()
     root.title("Settings")
     root["bg"] = "#101010"
-    root.geometry("600x600")
+    root.geometry("450x200")
     root.resizable(False, False)
     
-    warningLabel = tkinter.Label(root, text = "After all changes restart is required.", fg = "yellow", bg = "#101010", font = ("Consolas", 14))
-    warningLabel.grid(row = 0, column = 0, columnspan = 2, rowspan = 2)
+    """warningLabel = tkinter.Label(root, text = "After all changes restart is required.", fg = "yellow", bg = "#101010", font = ("Consolas", 14))
+    warningLabel.grid(row = 0, column = 0, columnspan = 2, rowspan = 2)"""
 
     vertexSelectionRangeLabel = tkinter.Label(root, text = "Vertex selection range:", bg = "#101010", fg = "white", font = ("Consolas", 14))
     vertexSelectionRangeLabel.grid(row = 2, column = 0)
     vertexSelectionRangeEntry = tkinter.Entry(root, bg = "#202020", fg = "white")
     vertexSelectionRangeEntry.grid(row = 2, column = 1)
+    vertexSelectionRangeEntry.insert(0, settings_["vertexSelectionRange"])
 
     def drawBackgroundGridChecked():
         if DBGCVar.get() == 1:
@@ -301,6 +293,7 @@ def settings():
                                              activebackground = "#101010", activeforeground = "white", offvalue = 0, onvalue = 1, selectcolor = "black",
                                              command = drawBackgroundGridChecked, variable = DBGCVar)
     drawBackgroundGridCheckbox.grid(row = 3, column = 0)
+    if drawBackgroundGrid: drawBackgroundGridCheckbox.select()
 
     def fullscreenChecked():
         if fullscreenVar.get() == 1:
@@ -313,16 +306,19 @@ def settings():
                                              activebackground = "#101010", activeforeground = "white", offvalue = 0, onvalue = 1, selectcolor = "black",
                                              command = fullscreenChecked, variable = fullscreenVar)
     fullscreenCheckbox.grid(row = 4, column = 0)
+    if fullscreen: fullscreenCheckbox.select()
 
     backgroundGridColorLabel = tkinter.Label(root, text = "Background grid color: ", bg = "#101010", fg = "white", font = ("Consolas", 14))
     backgroundGridColorLabel.grid(row = 5, column = 0)
     backgroundGridColorEntry = tkinter.Entry(root, bg = "#202020", fg = "white")
     backgroundGridColorEntry.grid(row = 5, column = 1)
+    backgroundGridColorEntry.insert(0, settings_["backgroundGridColor"])
 
     backgroundGridSizeLabel = tkinter.Label(root, text = "Background grid size: ", bg = "#101010", fg = "white", font = ("Consolas", 14))
     backgroundGridSizeLabel.grid(row = 6, column = 0)
     backgroundGridSizeEntry = tkinter.Entry(root, bg = "#202020", fg = "white")
     backgroundGridSizeEntry.grid(row = 6, column = 1)
+    backgroundGridSizeEntry.insert(0, settings_["backgroundGridSize"])
     
     def apply():
         try: 
@@ -335,21 +331,28 @@ def settings():
         except: pass
         json.dump(settings_, open("Resources/general.json", "w"), indent = 4)
 
+        json.dump({
+            "vertices": vertices, "edges": edges, "isWeighted": isWeighted
+        }, open("Storage/latestRestart.json", "w"))
+
+        python = sys.executable
+        os.execl(python, python, * sys.argv)
+
     applyButton = tkinter.Button(root, text = "Apply", bg = "#fafafa", fg = "black", font = ("Consolas", 14), command = apply)
-    applyButton.grid(row = 7, column = 0, columnspan = 2)
+    applyButton.grid(row = 7, column = 0)
 
     root.mainloop()
 buttons.append(Button(10, 310, 110, 40, "Settings", font.medium, settings))
 
 buttonPanelRect = pygame.Rect(0, 0, 150, height)
 buttonPanelBG = pygame.Surface((buttonPanelRect.width, buttonPanelRect.height))
-s = pygame.Surface((2, 2))
-s.set_at((0, 0), (50, 50, 50))
-s.set_at((1, 1), (50, 50, 50))
-s.set_at((0, 1), (0, 0, 0))
-s.set_at((1, 0), (0, 0, 0))
+s = pygame.Surface((2, 5))
+pygame.draw.line(s, (50, 50, 50), (0, 0), (0, 2))
+pygame.draw.line(s, (50, 50, 50), (1, 2), (1, 5))
+s.set_at((1, 0), (50, 50, 50))
 buttonPanelBG.blit(pygame.transform.smoothscale(s, (buttonPanelRect.width, buttonPanelRect.height)), (0, 0))
 del s
+
 
 while True:
     screen.fill((0, 0, 0))
@@ -430,9 +433,9 @@ while True:
                             clearPopUpButtons()
                         def changeWeight():
                             global isWeighted
-                            try: edges[edges.index(selectedEdge)][2] = int(tkinter.simpledialog.askstring("Change weight", "Weight: "))
+                            try: edges[edges.index(selectedEdge)][2] = int(simpledialog.askstring("Change weight", "Weight: "))
                             except: 
-                                tkinter.messagebox.showerror("Error", "Invalid input")
+                                messagebox.showerror("Error", "Invalid input")
                                 print(f"{fg.RED} Error: invalid input {fg.RESET}")
                                 edges[edges.index(selectedEdge)][2] = 1
                             isWeighted = True
@@ -459,7 +462,7 @@ while True:
                             vertices.remove(selectedVertex)
                             clearPopUpButtons()
                         def rename():
-                            vertices[vertices.index(selectedVertex)][2] = tkinter.simpledialog.askstring("Rename vertex", "New name: ")
+                            vertices[vertices.index(selectedVertex)][2] = simpledialog.askstring("Rename vertex", "New name: ")
                             clearPopUpButtons()
 
                         x, y = position[0], position[1]
@@ -479,7 +482,8 @@ while True:
             pygame.draw.line(screen, backgroundGridColor, (0, y), (width, y))
                 
     for vertex in vertices:
-        color = (255, 255, 255) if not distance(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], vertex[0], vertex[1]) <= vertexSelectionRange else (50, 255, 50)
+        color = (50, 255, 50) if distance(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], vertex[0], vertex[1]) <= vertexSelectionRange or \
+            vertex == selected else (255, 255, 255)
         pygame.draw.circle(screen, color, (vertex[0], vertex[1]), 10)
         text = font.small.render(vertex[2], True, (255, 255, 255))
         screen.blit(text, (vertex[0] - text.get_width() // 2, vertex[1] - 15 - text.get_height()))
@@ -517,9 +521,13 @@ while True:
     for button in buttons:
         button.draw()
 
-    screen.blit(font.small.render(f"Vertices: {len(vertices)}", True, "black", "white"), (10, height - 20))
+    screen.blit(font.small.render(f"Vertices: {len(vertices)}", True, "black", "white"), (10, height - 60))
     screen.blit(font.small.render(f"Edges: {len(edges)}", True, "black", "white"), (10, height - 40))
-    screen.blit(font.small.render(f"Total weight: {sum([int(edge[2]) for edge in edges])}", True, "black", "white"), (10, height - 60))
-
-    pygame.display.flip()
+    screen.blit(font.small.render(f"Total weight: {sum([int(edge[2]) for edge in edges])}", True, "black", "white"), (10, height - 20))
+    
+    pygame.display.update()
     clock.tick(fps)
+
+    if content != "":
+        settings()
+        content = ""
