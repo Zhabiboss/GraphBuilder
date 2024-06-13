@@ -5,15 +5,16 @@
     },
     "fullscreen": false,
     "fps": 144,
-    "version": "BETA",
+    "version": "v0.0.1",
     "font": "Consolas.ttf",
     "vertexSelectionRange": 30,
     "drawBackgroundGrid": true,
-    "backgroundGridColor": "#101010",
+    "backgroundGridColor": "#141414",
     "backgroundGridSize": 30,
     "controlsInfo": [
         "Left click: vertex/edge",
         "Right click: rename/remove",
         "Middle click: pan around"
-    ]
+    ],
+    "autoSaveInterval": 3
 }

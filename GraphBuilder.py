@@ -4,10 +4,13 @@ import os
 import math
 import json
 import sys
+import threading
+import time
 try:
     import tkinter.messagebox as messagebox
     import tkinter.simpledialog as simpledialog
     import tkinter.colorchooser as colorchooser
+    import tkinter.filedialog as filedialog
     import tkinter
     import pygame
     import colorama
@@ -57,6 +60,54 @@ drawBackgroundGrid = general["drawBackgroundGrid"]
 backgroundGridColor = general["backgroundGridColor"]
 backgroundGridSize = general["backgroundGridSize"]
 
+autoSaveInterval = general["autoSaveInterval"]
+timer = 0
+
+states = [{"vertices": [], "edges": []}]
+currentStateIndex = 0
+
+def saveState():
+    global states, currentStateIndex
+    # Save the current state
+    state = {
+        "vertices": [vertex.copy() for vertex in vertices],
+        "edges": [edge.copy() for edge in edges]
+    }
+    if currentStateIndex < len(states) - 1:
+        states = states[:currentStateIndex + 1]
+    states.append(state)
+    currentStateIndex += 1
+
+def undo():
+    global currentStateIndex
+    if currentStateIndex > 0:
+        currentStateIndex -= 1
+        load_state(states[currentStateIndex])
+
+def redo():
+    global currentStateIndex
+    if currentStateIndex < len(states) - 1:
+        currentStateIndex += 1
+        load_state(states[currentStateIndex])
+
+def load_state(state):
+    global vertices, edges
+    vertices = [vertex.copy() for vertex in state["vertices"]]
+    edges = [edge.copy() for edge in state["edges"]]
+
+def autoSave():
+    json.dump({
+        "vertices": vertices, "edges": edges, "isWeighted": isWeighted
+    }, open("Storage/autoSave.json", "w"))
+    if location:
+        if os.path.isfile(location):
+            with open(location, "w") as file:
+                file.write(json.dumps({
+                    "vertices": vertices, "edges": edges, "isWeighted": isWeighted
+                }))
+                file.close()
+    print(f"{bg.BLUE}{fg.BLACK} Auto save made: [{time.strftime('%H:%M:%S')}] {fg.RESET}{bg.RESET}")
+
 class PopUpButton:
     def __init__(self, x, y, width, height, text, font, action):
         self.x, self.y = x, y
@@ -79,7 +130,9 @@ class PopUpButton:
 
     def onClick(self):
         if self.rect.collidepoint(pygame.mouse.get_pos()):
-            self.action()
+            thread = threading.Thread(target = self.action)
+            threads.append(thread)
+            thread.start()
             return True
         return False
     
@@ -105,7 +158,9 @@ class Button:
 
     def onClick(self):
         if self.rect.collidepoint(pygame.mouse.get_pos()):
-            self.action()
+            thread = threading.Thread(target = self.action)
+            threads.append(thread)
+            thread.start()
             return True
         return False
 
@@ -114,34 +169,34 @@ def distance(x1, y1, x2, y2):
 
 def distanceToLine(x, y, lx1, ly1, lx2, ly2):
     # Calculate the line segment vector (lx2-lx1, ly2-ly1) and the point vector (x-lx1, y-ly1)
-    line_vec_x = lx2 - lx1
-    line_vec_y = ly2 - ly1
-    point_vec_x = x - lx1
-    point_vec_y = y - ly1
+    lineVecX = lx2 - lx1
+    lineVecY = ly2 - ly1
+    pointVecX = x - lx1
+    pointVecY = y - ly1
     
     # Calculate the length of the line segment
-    line_length = distance(lx1, ly1, lx2, ly2)
+    lineLength = distance(lx1, ly1, lx2, ly2)
     
     # If the segment's length is zero, it is a point, return distance to this point
-    if line_length == 0:
+    if lineLength == 0:
         return distance(x, y, lx1, ly1)
     
     # Calculate the projection scalar of the point vector onto the line vector
-    projection = (point_vec_x * line_vec_x + point_vec_y * line_vec_y) / (line_length ** 2)
+    projection = (pointVecX * lineVecX + pointVecY * lineVecY) / (lineLength ** 2)
     
     # Calculate the closest point on the segment
     if projection < 0:
-        closest_x = lx1
-        closest_y = ly1
+        closestX = lx1
+        closestY = ly1
     elif projection > 1:
-        closest_x = lx2
-        closest_y = ly2
+        closestX = lx2
+        closestY = ly2
     else:
-        closest_x = lx1 + projection * line_vec_x
-        closest_y = ly1 + projection * line_vec_y
+        closestX = lx1 + projection * lineVecX
+        closestY = ly1 + projection * lineVecY
     
     # Return the distance from the point to the closest point on the segment
-    return distance(x, y, closest_x, closest_y)
+    return distance(x, y, closestX, closestY)
 
 vertices = []
 edges = []
@@ -190,17 +245,16 @@ if contentF11 != "":
 
 def save():
     global location
-    location = simpledialog.askstring('Save graph', 'Graph name: ', initialvalue = 'Graph')
+    location = filedialog.asksaveasfilename(defaultextension = ".json")
     if location == None: return
     pygame.display.set_caption(f"Graph Builder {version}  |  {location}")
-    location += ".json"
     json.dump({
         "vertices": vertices, "edges": edges, "isWeighted": isWeighted
     }, open(location, "w"))
 
 def load():
-    global vertices, edges, isWeighted, location
-    location = simpledialog.askstring('Load graph', 'Path to graph json: ', initialvalue = 'Graph.json')
+    global vertices, edges, isWeighted, location, states, currentStateIndex
+    location = filedialog.askopenfilename()
     if location == None: return
     elif not os.path.isfile(location):
         messagebox.showerror("Error", f"File not found: {location}")
@@ -211,16 +265,33 @@ def load():
     vertices = data["vertices"]
     edges = data["edges"]
     isWeighted = data["isWeighted"]
+    saveState()
+    states = [{"vertices": [], "edges": []}]
+    currentStateIndex = 0
 
 controlsInfo = general["controlsInfo"]
 
 def properExit():
-    if vertices == [] and edges == []: pygame.quit(); sys.exit()
-    if not location: save()
+    autoSave()
+    with open("Storage/autoSave.json", "r") as autoSaveFile:
+        content = autoSaveFile.read()
+        autoSaveFile.close()
+    if location and content != "":
+        if os.path.isfile(location):
+            with open(location, "w") as file:
+                file.write(content)
+                file.close()
+            pygame.quit()
+            sys.exit(0)
+    if vertices == [] and edges == []:
+        pygame.quit()
+        sys.exit(0)
+    elif not location: save()
     else:
         if not os.path.isfile(location): save()
         else:
             if json.load(open(location, "r")) != {"vertices": vertices, "edges": edges, "isWeighted": isWeighted}: save()
+
     pygame.quit()
     sys.exit(0)
 
@@ -267,6 +338,7 @@ def dijkstra(vertices, edges, start, end):
     return path
 
 def leastExpensivePath():
+    global highlightedPath
     start = simpledialog.askstring("Least expensive path", "Start vertex: ")
     if not start: return
     end = simpledialog.askstring("Least expensive path", "End vertex: ")
@@ -276,12 +348,21 @@ def leastExpensivePath():
     for vertex in vertices:
         if end == vertex[2]: end = vertex; break
     path = dijkstra(vertices, edges, start, end)
-    messagebox.showinfo("Least expensive path", f"Path: {', '.join(vertex[2] for vertex in path)}")
+    print(path)
+    print(start)
+    print(end)
+    if not (tuple(start) in path) or not (tuple(end) in path):
+        messagebox.showerror("Error", f"No path found from {start} to {end}")
+        print(f"{fg.RED} Error: no path found {fg.RESET}")
+    else:
+        messagebox.showinfo("Least expensive path", f"Path: {', '.join(vertex[2] for vertex in path)}")
+        highlightedPath = path
 
 def clear():
     global vertices, edges
     vertices.clear()
     edges.clear()
+    saveState()
 
 def settings():
     settings_ = general
@@ -364,11 +445,13 @@ def settings():
 
 buttons.append(Button(10, 10, 100, 40, "Save", font.medium, save))
 buttons.append(Button(10, 60, 100, 40, "Load", font.medium, load))
-buttons.append(Button(10, 110, 140, 40, "Controls", font.medium, lambda: messagebox.showinfo("Controls", "\n".join(controlsInfo))))
+buttons.append(Button(10, 110, 110, 40, "Controls", font.medium, lambda: messagebox.showinfo("Controls", "\n".join(controlsInfo))))
 buttons.append(Button(10, 160, 110, 40, "Settings", font.medium, settings))
 buttons.append(Button(10, 210, 100, 40, "Quit", font.medium, properExit))
 buttons.append(Button(10, 310, 100, 40, "Clear", font.medium, clear))
 buttons.append(Button(10, 360, 110, 40, "Dijkstra", font.medium, leastExpensivePath))
+buttons.append(Button(10, 460, 100, 40, "Undo", font.medium, undo))
+buttons.append(Button(10, 510, 100, 40, "Redo", font.medium, redo))
 
 buttonPanelRect = pygame.Rect(0, 0, 160, height)
 buttonPanelBG = pygame.Surface((buttonPanelRect.width, buttonPanelRect.height))
@@ -381,6 +464,12 @@ del s
 
 viewOffset = [0, 0]
 prevMousePos = [0, 0]
+
+threads: list[threading.Thread] = []
+
+deltaTime = lambda: 1 / clock.get_fps() if clock.get_fps() != 0 else 1 / fps
+
+highlightedPath = []
 
 while True:
     screen.fill((0, 0, 0))
@@ -398,6 +487,10 @@ while True:
                 python = sys.executable
                 os.execl(python, python, * sys.argv)
 
+            if pygame.key.get_pressed()[pygame.K_LCTRL]:
+                if event.key == pygame.K_z: undo()
+                if event.key == pygame.K_y: redo()
+
         if event.type == pygame.MOUSEBUTTONDOWN:
             wasPopUpButtonPressed = False
             for button in PopUpButtons:
@@ -406,7 +499,7 @@ while True:
                 for button in buttons:
                     if button.onClick(): wasPopUpButtonPressed = True; break
                     
-            if len(PopUpButtons) == 0 and not wasPopUpButtonPressed and not buttonPanelRect.collidepoint(*pygame.mouse.get_pos()):
+            if len(PopUpButtons) == 0 and not wasPopUpButtonPressed and not buttonPanelRect.collidepoint(*pygame.mouse.get_pos()) and highlightedPath == []:
                 for button in buttons:
                     if button.rect.collidepoint(*pygame.mouse.get_pos()):
                         continue
@@ -426,13 +519,19 @@ while True:
                                 break
                         if selectedEdge == None:
                             vertices.append([adjusted_pos[0], adjusted_pos[1], str(len(vertices) + 1)])
+                            saveState()
 
                     elif selectedVertex != None:
                         if selected != None:
                             vertex = selectedVertex
+                            biDirectional = False
                             for edge in edges:
-                                if edge[0] == vertex and edge[1] == selected: edges[edges.index(edge)][3] = "db"
-                            if selected != vertex: edges.append([selected, vertex, 1, "ds"])
+                                if edge[0] == vertex and edge[1] == selected: 
+                                    edges[edges.index(edge)][3] = "db"
+                                    biDirectional = True
+                                    break
+                            if selected != vertex and not biDirectional: edges.append([selected, vertex, 1, "ds"])
+                            saveState()
                             clickedOnVertex = True
                             selected = None
                         else:
@@ -454,12 +553,14 @@ while True:
                                 break
                         if selectedEdge == None:
                             vertices.append([adjusted_pos[0], adjusted_pos[1], str(len(vertices) + 1)])
+                            saveState()
 
                     if selectedEdge != None:
                         def clearPopUpButtons(): PopUpButtons.clear()
                         def remove():
                             if selectedEdge in edges:
                                 edges.remove(selectedEdge)
+                                saveState()
                             clearPopUpButtons()
                         def changeWeight():
                             global isWeighted
@@ -469,6 +570,7 @@ while True:
                                 print(f"{fg.RED} Error: invalid input {fg.RESET}")
                                 edges[edges.index(selectedEdge)][2] = 1
                             isWeighted = True
+                            saveState()
                             clearPopUpButtons()
 
                         x, y = position[0], position[1]
@@ -483,9 +585,11 @@ while True:
                         def remove():
                             edges[:] = [edge for edge in edges if edge[0] != selectedVertex and edge[1] != selectedVertex]
                             vertices.remove(selectedVertex)
+                            saveState()
                             clearPopUpButtons()
                         def rename():
                             vertices[vertices.index(selectedVertex)][2] = simpledialog.askstring("Rename vertex", "New name: ")
+                            saveState()
                             clearPopUpButtons()
 
                         x, y = position[0], position[1]
@@ -497,7 +601,7 @@ while True:
             
             else:
                 if not wasPopUpButtonPressed: PopUpButtons.clear()
-
+                if pygame.mouse.get_pressed()[0] or pygame.mouse.get_pressed()[2]: highlightedPath = []
 
     if len(PopUpButtons) == 0 and not buttonPanelRect.collidepoint(*pygame.mouse.get_pos()) and pygame.mouse.get_pressed()[1]:
         position = pygame.mouse.get_pos()
@@ -514,12 +618,14 @@ while True:
     for vertex in vertices:
         color = (50, 255, 50) if distance(pygame.mouse.get_pos()[0] + viewOffset[0], pygame.mouse.get_pos()[1] + viewOffset[1], vertex[0], vertex[1]) <= vertexSelectionRange else (255, 255, 255)
         if vertex == selected: color = (0, 200, 0)
+        if tuple(vertex) in highlightedPath: color = (0, 0, 255)
         pygame.draw.circle(screen, color, (vertex[0] - viewOffset[0], vertex[1] - viewOffset[1]), 10)
         text = font.small.render(vertex[2], True, (255, 255, 255))
         screen.blit(text, (vertex[0] - text.get_width() // 2 - viewOffset[0], vertex[1] - 15 - text.get_height() - viewOffset[1]))
 
     for edge in edges:
         color = (255, 255, 255) if not distanceToLine(pygame.mouse.get_pos()[0] + viewOffset[0], pygame.mouse.get_pos()[1] + viewOffset[1], edge[0][0], edge[0][1], edge[1][0], edge[1][1]) <= vertexSelectionRange else (50, 255, 50)
+        if tuple(edge[0]) in highlightedPath and tuple(edge[1]) in highlightedPath: color = (0, 0, 255)
         angle = math.atan2(edge[0][1] - edge[1][1], edge[0][0] - edge[1][0])
         pygame.draw.line(screen, color, (edge[0][0] - math.cos(angle) * 10 - viewOffset[0], edge[0][1] - math.sin(angle) * 10 - viewOffset[1]), 
                          (edge[1][0] + math.cos(angle) * 10 - viewOffset[0], edge[1][1] + math.sin(angle) * 10 - viewOffset[1]), 2)
@@ -558,9 +664,19 @@ while True:
     
     prevMousePos = list(pygame.mouse.get_pos())
 
+    timer += deltaTime()
+
+    if timer >= autoSaveInterval:
+        thread = threading.Thread(target = autoSave)
+        threads.append(thread)
+        thread.start()
+        timer = 0
+
     pygame.display.update()
     clock.tick(fps)
 
     if content != "":
-        settings()
+        thread = threading.Thread(target = settings)
+        threads.append(thread)
+        thread.start()
         content = ""
