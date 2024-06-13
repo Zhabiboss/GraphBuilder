@@ -7,6 +7,7 @@ import sys
 try:
     import tkinter.messagebox as messagebox
     import tkinter.simpledialog as simpledialog
+    import tkinter.colorchooser as colorchooser
     import tkinter
     import pygame
     import colorama
@@ -21,13 +22,15 @@ fg = colorama.Fore
 print(f"{fg.GREEN} Initializing pygame... {fg.RESET}")
 pygame.init()
 
-print(f"{fg.GREEN} Initalizing Graph Builder... {fg.RESET}")
+print(f"{fg.GREEN} Initializing Graph Builder... {fg.RESET}")
 
 general = json.load(open("Resources/general.json"))
 
 fullscreen = general["fullscreen"]
-if fullscreen: res = width, height = pygame.display.Info().current_w, pygame.display.Info().current_h
-else: res = width, height = general["resolution"]["width"], general["resolution"]["height"]
+if fullscreen:
+    res = width, height = pygame.display.Info().current_w, pygame.display.Info().current_h
+else:
+    res = width, height = general["resolution"]["width"], general["resolution"]["height"]
 screen = pygame.display.set_mode(res, pygame.FULLSCREEN if fullscreen else 0)
 
 version = general["version"]
@@ -326,10 +329,14 @@ def settings():
 
     backgroundGridColorLabel = tkinter.Label(root, text = "Background grid color: ", bg = "#101010", fg = "white", font = ("Consolas", 14))
     backgroundGridColorLabel.grid(row = 5, column = 0)
-    backgroundGridColorEntry = tkinter.Entry(root, bg = "#202020", fg = "white")
-    backgroundGridColorEntry.grid(row = 5, column = 1)
-    backgroundGridColorEntry.insert(0, settings_["backgroundGridColor"])
 
+    def backgroundGridColorColorpicker_():
+        color = colorchooser.askcolor(initialcolor = general["backgroundGridColor"])
+        if color[1] != None:
+            settings_["backgroundGridColor"] = color[1]
+
+    backgroundGridColorColorpicker = tkinter.Button(root, text = "Choose color", bg = "#202020", fg = "white", font = ("Consolas", 14), command = backgroundGridColorColorpicker_)
+    backgroundGridColorColorpicker.grid(row = 5, column = 1)
     backgroundGridSizeLabel = tkinter.Label(root, text = "Background grid size: ", bg = "#101010", fg = "white", font = ("Consolas", 14))
     backgroundGridSizeLabel.grid(row = 6, column = 0)
     backgroundGridSizeEntry = tkinter.Entry(root, bg = "#202020", fg = "white")
@@ -337,10 +344,6 @@ def settings():
     backgroundGridSizeEntry.insert(0, settings_["backgroundGridSize"])
     
     def apply():
-        try: 
-            pygame.Color(backgroundGridColorEntry.get())
-            settings_["backgroundGridColor"] = backgroundGridColorEntry.get()
-        except: pass
         try: 
             settings_["backgroundGridSize"] = int(backgroundGridSizeEntry.get())
             settings_["vertexSelectionRange"] = int(vertexSelectionRangeEntry.get())
@@ -376,6 +379,8 @@ s.set_at((1, 0), (50, 50, 50))
 buttonPanelBG.blit(pygame.transform.smoothscale(s, (buttonPanelRect.width, buttonPanelRect.height)), (0, 0))
 del s
 
+viewOffset = [0, 0]
+prevMousePos = [0, 0]
 
 while True:
     screen.fill((0, 0, 0))
@@ -407,19 +412,20 @@ while True:
                         continue
                 if pygame.mouse.get_pressed()[0]:
                     position = pygame.mouse.get_pos()
+                    adjusted_pos = [position[0] + viewOffset[0], position[1] + viewOffset[1]]
                     selectedVertex = None
                     selectedEdge = None
                     for vertex in vertices:
-                        if distance(position[0], position[1], vertex[0], vertex[1]) <= vertexSelectionRange: 
+                        if distance(adjusted_pos[0], adjusted_pos[1], vertex[0], vertex[1]) <= vertexSelectionRange: 
                             selectedVertex = vertex
                             break
                     if selectedVertex == None: 
                         for edge in edges:
-                            if distanceToLine(position[0], position[1], edge[0][0], edge[0][1], edge[1][0], edge[1][1]) <= vertexSelectionRange:
+                            if distanceToLine(adjusted_pos[0], adjusted_pos[1], edge[0][0], edge[0][1], edge[1][0], edge[1][1]) <= vertexSelectionRange:
                                 selectedEdge = edge
                                 break
                         if selectedEdge == None:
-                            vertices.append([position[0], position[1], str(len(vertices) + 1)])
+                            vertices.append([adjusted_pos[0], adjusted_pos[1], str(len(vertices) + 1)])
 
                     elif selectedVertex != None:
                         if selected != None:
@@ -434,19 +440,20 @@ while True:
                 
                 elif pygame.mouse.get_pressed()[2]:
                     position = pygame.mouse.get_pos()
+                    adjusted_pos = [position[0] + viewOffset[0], position[1] + viewOffset[1]]
                     selectedVertex = None
                     selectedEdge = None
                     for vertex in vertices:
-                        if distance(position[0], position[1], vertex[0], vertex[1]) <= vertexSelectionRange: 
+                        if distance(adjusted_pos[0], adjusted_pos[1], vertex[0], vertex[1]) <= vertexSelectionRange: 
                             selectedVertex = vertex
                             break
                     if selectedVertex == None: 
                         for edge in edges:
-                            if distanceToLine(position[0], position[1], edge[0][0], edge[0][1], edge[1][0], edge[1][1]) <= vertexSelectionRange:
+                            if distanceToLine(adjusted_pos[0], adjusted_pos[1], edge[0][0], edge[0][1], edge[1][0], edge[1][1]) <= vertexSelectionRange:
                                 selectedEdge = edge
                                 break
                         if selectedEdge == None:
-                            vertices.append([position[0], position[1], str(len(vertices) + 1)])
+                            vertices.append([adjusted_pos[0], adjusted_pos[1], str(len(vertices) + 1)])
 
                     if selectedEdge != None:
                         def clearPopUpButtons(): PopUpButtons.clear()
@@ -491,44 +498,52 @@ while True:
             else:
                 if not wasPopUpButtonPressed: PopUpButtons.clear()
 
+
+    if len(PopUpButtons) == 0 and not buttonPanelRect.collidepoint(*pygame.mouse.get_pos()) and pygame.mouse.get_pressed()[1]:
+        position = pygame.mouse.get_pos()
+        movement = [position[0] - prevMousePos[0], position[1] - prevMousePos[1]]
+        viewOffset[0] -= movement[0]
+        viewOffset[1] -= movement[1]
+
     if drawBackgroundGrid:
         for x in range(0, width, backgroundGridSize):
-            pygame.draw.line(screen, backgroundGridColor, (x, 0), (x, height))
+            pygame.draw.line(screen, backgroundGridColor, (x - viewOffset[0] % backgroundGridSize, 0), (x - viewOffset[0] % backgroundGridSize, height))
         for y in range(0, height, backgroundGridSize):
-            pygame.draw.line(screen, backgroundGridColor, (0, y), (width, y))
+            pygame.draw.line(screen, backgroundGridColor, (0, y - viewOffset[1] % backgroundGridSize), (width, y - viewOffset[1] % backgroundGridSize))
                 
     for vertex in vertices:
-        color = (50, 255, 50) if distance(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], vertex[0], vertex[1]) <= vertexSelectionRange or \
-            vertex == selected else (255, 255, 255)
-        pygame.draw.circle(screen, color, (vertex[0], vertex[1]), 10)
+        color = (50, 255, 50) if distance(pygame.mouse.get_pos()[0] + viewOffset[0], pygame.mouse.get_pos()[1] + viewOffset[1], vertex[0], vertex[1]) <= vertexSelectionRange else (255, 255, 255)
+        if vertex == selected: color = (0, 200, 0)
+        pygame.draw.circle(screen, color, (vertex[0] - viewOffset[0], vertex[1] - viewOffset[1]), 10)
         text = font.small.render(vertex[2], True, (255, 255, 255))
-        screen.blit(text, (vertex[0] - text.get_width() // 2, vertex[1] - 15 - text.get_height()))
+        screen.blit(text, (vertex[0] - text.get_width() // 2 - viewOffset[0], vertex[1] - 15 - text.get_height() - viewOffset[1]))
 
     for edge in edges:
-        color = (255, 255, 255) if not distanceToLine(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1], edge[0][0], edge[0][1], edge[1][0], edge[1][1]) <= vertexSelectionRange else (50, 255, 50)
-        pygame.draw.line(screen, color, (edge[0][0], edge[0][1]), (edge[1][0], edge[1][1]), 2)
+        color = (255, 255, 255) if not distanceToLine(pygame.mouse.get_pos()[0] + viewOffset[0], pygame.mouse.get_pos()[1] + viewOffset[1], edge[0][0], edge[0][1], edge[1][0], edge[1][1]) <= vertexSelectionRange else (50, 255, 50)
+        angle = math.atan2(edge[0][1] - edge[1][1], edge[0][0] - edge[1][0])
+        pygame.draw.line(screen, color, (edge[0][0] - math.cos(angle) * 10 - viewOffset[0], edge[0][1] - math.sin(angle) * 10 - viewOffset[1]), 
+                         (edge[1][0] + math.cos(angle) * 10 - viewOffset[0], edge[1][1] + math.sin(angle) * 10 - viewOffset[1]), 2)
         if isWeighted:
-            text = font.small.render(str(edge[2]), True, (255, 255, 255))
-            pygame.draw.rect(screen, (0, 0, 0), text.get_rect(center = ((edge[0][0] + edge[1][0]) // 2, (edge[0][1] + edge[1][1]) // 2)))
-            screen.blit(text, ((edge[0][0] + edge[1][0]) // 2 - text.get_width() // 2, (edge[0][1] + edge[1][1]) // 2 - text.get_height() // 2))
+            text = font.small.render(str(edge[2]), True, (255, 255, 255), (0, 0, 0))
+            screen.blit(text, ((edge[0][0] + edge[1][0]) // 2 - text.get_width() // 2 - viewOffset[0], (edge[0][1] + edge[1][1]) // 2 - text.get_height() // 2 - viewOffset[1]))
         
         if edge[3] == "ds":
             angle = math.atan2(edge[0][1] - edge[1][1], edge[0][0] - edge[1][0])
-            pygame.draw.line(screen, color, (edge[1][0] + math.cos(angle) * 10, edge[1][1] + math.sin(angle) * 10), 
-                             (edge[1][0] + math.cos(angle - 2 * math.pi - math.pi / 8) * 20, edge[1][1] + math.sin(angle - 2 * math.pi - math.pi / 8) * 20), 2)
-            pygame.draw.line(screen, color, (edge[1][0] + math.cos(angle) * 10, edge[1][1] + math.sin(angle) * 10), 
-                             (edge[1][0] + math.cos(angle + 2 * math.pi + math.pi / 8) * 20, edge[1][1] + math.sin(angle + 2 * math.pi + math.pi / 8) * 20), 2)
+            pygame.draw.line(screen, color, (edge[1][0] + math.cos(angle) * 10 - viewOffset[0], edge[1][1] + math.sin(angle) * 10 - viewOffset[1]), 
+                             (edge[1][0] + math.cos(angle - 2 * math.pi - math.pi / 8) * 20 - viewOffset[0], edge[1][1] + math.sin(angle - 2 * math.pi - math.pi / 8) * 20 - viewOffset[1]), 2)
+            pygame.draw.line(screen, color, (edge[1][0] + math.cos(angle) * 10 - viewOffset[0], edge[1][1] + math.sin(angle) * 10 - viewOffset[1]), 
+                             (edge[1][0] + math.cos(angle + 2 * math.pi + math.pi / 8) * 20 - viewOffset[0], edge[1][1] + math.sin(angle + 2 * math.pi + math.pi / 8) * 20 - viewOffset[1]), 2)
         elif edge[3] == "db":
             angle = math.atan2(edge[0][1] - edge[1][1], edge[0][0] - edge[1][0])
-            pygame.draw.line(screen, color, (edge[1][0] + math.cos(angle) * 10, edge[1][1] + math.sin(angle) * 10), 
-                             (edge[1][0] + math.cos(angle - 2 * math.pi - math.pi / 8) * 20, edge[1][1] + math.sin(angle - 2 * math.pi - math.pi / 8) * 20), 2)
-            pygame.draw.line(screen, color, (edge[1][0] + math.cos(angle) * 10, edge[1][1] + math.sin(angle) * 10), 
-                             (edge[1][0] + math.cos(angle + 2 * math.pi + math.pi / 8) * 20, edge[1][1] + math.sin(angle + 2 * math.pi + math.pi / 8) * 20), 2)
+            pygame.draw.line(screen, color, (edge[1][0] + math.cos(angle) * 10 - viewOffset[0], edge[1][1] + math.sin(angle) * 10 - viewOffset[1]), 
+                             (edge[1][0] + math.cos(angle - 2 * math.pi - math.pi / 8) * 20 - viewOffset[0], edge[1][1] + math.sin(angle - 2 * math.pi - math.pi / 8) * 20 - viewOffset[1]), 2)
+            pygame.draw.line(screen, color, (edge[1][0] + math.cos(angle) * 10 - viewOffset[0], edge[1][1] + math.sin(angle) * 10 - viewOffset[1]), 
+                             (edge[1][0] + math.cos(angle + 2 * math.pi + math.pi / 8) * 20 - viewOffset[0], edge[1][1] + math.sin(angle + 2 * math.pi + math.pi / 8) * 20 - viewOffset[1]), 2)
             angle = math.atan2(edge[1][1] - edge[0][1], edge[1][0] - edge[0][0])
-            pygame.draw.line(screen, color, (edge[0][0] + math.cos(angle) * 10, edge[0][1] + math.sin(angle) * 10), 
-                             (edge[0][0] + math.cos(angle - 2 * math.pi - math.pi / 8) * 20, edge[0][1] + math.sin(angle - 2 * math.pi - math.pi / 8) * 20), 2)
-            pygame.draw.line(screen, color, (edge[0][0] + math.cos(angle) * 10, edge[0][1] + math.sin(angle) * 10),
-                             (edge[0][0] + math.cos(angle + 2 * math.pi + math.pi / 8) * 20, edge[0][1] + math.sin(angle + 2 * math.pi + math.pi / 8) * 20), 2)
+            pygame.draw.line(screen, color, (edge[0][0] + math.cos(angle) * 10 - viewOffset[0], edge[0][1] + math.sin(angle) * 10 - viewOffset[1]), 
+                             (edge[0][0] + math.cos(angle - 2 * math.pi - math.pi / 8) * 20 - viewOffset[0], edge[0][1] + math.sin(angle - 2 * math.pi - math.pi / 8) * 20 - viewOffset[1]), 2)
+            pygame.draw.line(screen, color, (edge[0][0] + math.cos(angle) * 10 - viewOffset[0], edge[0][1] + math.sin(angle) * 10 - viewOffset[1]),
+                             (edge[0][0] + math.cos(angle + 2 * math.pi + math.pi / 8) * 20 - viewOffset[0], edge[0][1] + math.sin(angle + 2 * math.pi + math.pi / 8) * 20 - viewOffset[1]), 2)
             
     for button in PopUpButtons:
         button.draw()
@@ -541,6 +556,8 @@ while True:
     screen.blit(font.small.render(f"Edges: {len(edges)}", True, "black", "white"), (10, height - 40))
     screen.blit(font.small.render(f"Total weight: {sum([int(edge[2]) for edge in edges])}", True, "black", "white"), (10, height - 20))
     
+    prevMousePos = list(pygame.mouse.get_pos())
+
     pygame.display.update()
     clock.tick(fps)
 

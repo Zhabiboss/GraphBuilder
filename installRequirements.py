@@ -19,6 +19,7 @@ except: pass
 try:
     import tkinter.messagebox as messagebox
     import tkinter.simpledialog as simpledialog
+    import tkinter.colorchooser as colorchooser
     import pygame
     import colorama
 except:

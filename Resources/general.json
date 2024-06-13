@@ -13,6 +13,7 @@
     "backgroundGridSize": 30,
     "controlsInfo": [
         "Left click: vertex/edge",
-        "Right click: rename/remove"
+        "Right click: rename/remove",
+        "Middle click: pan around"
     ]
 }
